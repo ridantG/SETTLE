@@ -1,178 +1,167 @@
-// src/app/preferences/page.tsx
+"use client";
 
-"use client"; 
-
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import LoggedInHeader from '@/components/LoggedInHeader';
-import ImageUpload from '@/components/ImageUpload';
-import MultiImageUpload from '@/components/MultiImageUpload';
-import toast from 'react-hot-toast';
-import { FaUser, FaBirthdayCake, FaBriefcase, FaUniversity, FaUtensils } from 'react-icons/fa';
-
-type Profile = { name: string; age: string; status: string; organization: string; diet: string; description: string; image_url: string | null; drinks: boolean | null; smokes: boolean | null; flat_image_urls: string[] | null; };
-const blankProfile: Profile = { name: '', age: '', status: '', organization: '', diet: '', description: '', image_url: null, drinks: null, smokes: null, flat_image_urls: [], };
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import LoggedInHeader from "@/components/LoggedInHeader";
+import toast, { Toaster } from "react-hot-toast";
+import { type User } from "@supabase/supabase-js";
+import { FaExchangeAlt } from "react-icons/fa";
+import { useForm, FormProvider, type SubmitHandler, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { profileSchema, type Profile } from "@/lib/schemas";
+import OnboardingForm from "@/components/OnboardingForm";
 
 export default function PreferencesPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [profile, setProfile] = useState<Profile>(blankProfile);
-  const [profileImagePath, setProfileImagePath] = useState<string | null>(null);
-  const [flatImagePaths, setFlatImagePaths] = useState<string[]>([]);
+  const [user, setUser] = useState<User | null>(null);
 
-  const getProfile = useCallback(async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.push('/login'); return; }
+  const [profile, setProfile] = useState<Profile | null>(null);
 
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (data) { setProfile(data); }
-    setLoading(false);
-  }, [supabase, router]);
+  const methods = useForm<Profile>({
+    resolver: zodResolver(profileSchema) as Resolver<Profile>,
+    defaultValues: profile ?? undefined,
+  });
 
-  useEffect(() => { getProfile(); }, [getProfile]);
+  const { reset, handleSubmit, setValue } = methods;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setProfile(prev => ({ ...prev, [e.target.id]: e.target.value }));
-  };
-  
-  const handleHabitChange = (habit: 'drinks' | 'smokes', value: boolean) => {
-    setProfile(prev => ({ ...prev, [habit]: value }));
-  };
+  const getProfile = useCallback(
+    async (currentUser: User) => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setIsSaving(true);
-    const toastId = toast.loading('Saving profile...');
+      if (data) {
+        const fullProfile = data as Profile;
+        setProfile(fullProfile);
+        reset(fullProfile);
+      } else {
+        router.push("/dashboard");
+      }
+      setLoading(false);
+    },
+    [supabase, router, reset]
+  );
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  useEffect(() => {
+    const checkUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) {
+        router.push("/login");
+        return;
+      }
+      setUser(session.user);
+      getProfile(session.user);
+    };
+    checkUser();
+  }, [getProfile, supabase.auth, router]);
 
-    let publicImageUrl = profile.image_url;
-    if (profileImagePath) {
-      const { data } = supabase.storage.from('avatars').getPublicUrl(profileImagePath);
-      publicImageUrl = data.publicUrl;
-    }
+  const handleSwitchRole = async () => {
+    if (!profile || !user) return;
 
-    const flatPublicUrls = flatImagePaths.map(path => {
-      const { data } = supabase.storage.from('flat-photos').getPublicUrl(path);
-      return data.publicUrl;
+    const newRole = (profile.role === "seeker" ? "lister" : "seeker") as Profile["role"];
+
+    const toastId = toast.loading("Switching role...");
+    const response = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: newRole }),
     });
-
-    const { error } = await supabase.from('profiles').upsert({
-      id: user.id, user_role: 'lister', name: profile.name, age: parseInt(profile.age) || null,
-      status: profile.status, organization: profile.organization, diet: profile.diet,
-      description: profile.description, image_url: publicImageUrl, drinks: profile.drinks,
-      smokes: profile.smokes, flat_image_urls: flatPublicUrls, updated_at: new Date().toISOString(),
-    });
-
     toast.dismiss(toastId);
-    if (error) { toast.error(`Error: ${error.message}`);
-    } else { toast.success('Profile saved!'); router.push('/seeker-results'); }
-    setIsSaving(false);
+
+    if (response.ok) {
+      setProfile((p) => (p ? { ...p, role: newRole } : p));
+      setValue("role", newRole);
+      toast.success(`You are now a ${newRole}!`);
+    } else {
+      toast.error("Failed to switch role.");
+    }
   };
 
-  if (loading) {
+  const onSave: SubmitHandler<Profile> = async (data) => {
+    const toastId = toast.loading("Saving profile...");
+    const { id, created_at, email, ...updateData } = data;
+    const response = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updateData),
+    });
+    toast.dismiss(toastId);
+
+    if (response.ok) {
+      toast.success("Profile saved!");
+      router.push("/dashboard");
+    } else {
+      toast.error("Failed to save profile.");
+    }
+  };
+
+  if (loading || !user || !profile) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <LoggedInHeader />
-        <main className="text-center py-20"><p>Loading Your Profile...</p></main>
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading Your Profile...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-center" />
       <LoggedInHeader />
       <main className="flex items-center justify-center py-12 px-4">
-        <div className="w-full max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-
-          <div className="hidden md:block text-left pr-8">
-            <h1 className="text-5xl font-extrabold text-gray-800 leading-tight">
-              List Your Space & <span className="text-green-600">Find a Roommate.</span>
-            </h1>
-            <p className="mt-4 text-lg text-gray-500">
-              Create a detailed profile of yourself and your space. This helps potential roommates understand if you&apos;d be a great fit to live with.
-            </p>
-            
-          </div>
-
+        <div className="w-full max-w-2xl mx-auto">
           <div className="bg-white p-8 rounded-2xl shadow-xl">
-             <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center md:hidden">Your Profile & Listing</h2>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <fieldset disabled={isSaving}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <FaUser className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                    <input type="text" id="name" value={profile.name || ''} onChange={handleChange} placeholder="Full Name" required className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-lg" />
-                  </div>
-                   <div className="relative">
-                    <FaBirthdayCake className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                    <input type="number" id="age" value={profile.age || ''} onChange={handleChange} placeholder="Age" required className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-lg" />
-                  </div>
-                </div>
+            {/* Page title */}
+            <h1 className="text-4xl font-bold text-gray-800 mb-2 text-center">
+              {profile.role === "seeker" ? "Tell Us About Yourself" : "Describe Your Space"}
+            </h1>
+            <p className="text-gray-500 text-center mb-6">
+              A great profile leads to great matches.
+            </p>
 
-                <ImageUpload label="Your Photograph" onUpload={(path) => setProfileImagePath(path)} />
-                <MultiImageUpload label="Photos of your Room/Flat (Max 6)" onUpload={(paths) => setFlatImagePaths(paths)} />
-            
-                <div className="relative">
-                  <FaBriefcase className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                  <select id="status" value={profile.status || ''} onChange={handleChange} required className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-lg appearance-none">
-                    <option value="" disabled>Select Your Status (Student/Professional)</option>
-                    <option value="Student">Student</option>
-                    <option value="Professional">Working Professional</option>
-                  </select>
-                </div>
-
-                {profile.status && (
-                  <div className="relative">
-                     <FaUniversity className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                     <input type="text" id="organization" value={profile.organization || ''} onChange={handleChange} className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-lg" placeholder={profile.status === 'Student' ? 'Institute Name' : 'Company Name'} required />
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Do you drink?</label>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => handleHabitChange('drinks', true)} className={`w-full py-2 rounded-lg text-sm font-semibold transition-all ${profile.drinks === true ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>Yes</button>
-                      <button type="button" onClick={() => handleHabitChange('drinks', false)} className={`w-full py-2 rounded-lg text-sm font-semibold transition-all ${profile.drinks === false ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>No</button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Do you smoke?</label>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => handleHabitChange('smokes', true)} className={`w-full py-2 rounded-lg text-sm font-semibold transition-all ${profile.smokes === true ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>Yes</button>
-                      <button type="button" onClick={() => handleHabitChange('smokes', false)} className={`w-full py-2 rounded-lg text-sm font-semibold transition-all ${profile.smokes === false ? 'bg-green-500 text-white shadow-md' : 'bg-gray-100 text-gray-600'}`}>No</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <FaUtensils className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400" />
-                  <select id="diet" value={profile.diet || ''} onChange={handleChange} required className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-lg appearance-none">
-                    <option value="" disabled>Select Dietary Preference</option>
-                    <option value="Vegetarian">Vegetarian</option>
-                    <option value="Non-Vegetarian">Non-Vegetarian</option>
-                    <option value="Flexible">Flexible</option>
-                  </select>
-                </div>
-
+            {/* Switch Role */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-8 border border-gray-200">
+              <div className="flex justify-between items-center">
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">About Yourself & Your Place</label>
-                  <textarea id="description" rows={4} value={profile.description || ''} onChange={handleChange} className="w-full p-3 bg-gray-50 rounded-lg" placeholder="Tell potential roommates about yourself, your lifestyle..."></textarea>
+                  <h3 className="text-lg font-semibold">Your Role</h3>
+                  <p className="text-sm text-gray-600">
+                    You are a{" "}
+                    <span className="font-bold text-green-600 capitalize">
+                      {profile.role}
+                    </span>
+                    .
+                  </p>
                 </div>
-                
-                <div className="pt-4">
-                  <button type="submit" disabled={isSaving} className="w-full bg-green-500 text-white font-bold py-3 px-5 rounded-lg text-lg hover:bg-green-600 disabled:opacity-50 transition-all transform hover:scale-105 shadow-lg">
-                    {isSaving ? 'Saving...' : 'Save Profile & Find a Roommate'}
-                  </button>
-                </div>
-              </fieldset>
-            </form>
+                <button
+                  onClick={handleSwitchRole}
+                  disabled={methods.formState.isSubmitting}
+                  className="flex items-center gap-2 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition disabled:opacity-70"
+                >
+                  <FaExchangeAlt />
+                  <span>Switch Role</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Onboarding Form */}
+            <FormProvider {...methods}>
+              {/* 
+                Ensure OnboardingForm's onSave prop is typed as:
+                onSave: (data: Profile) => Promise<void>
+              */}
+              <OnboardingForm
+                user={user}
+                profileData={profile}
+                onSave={handleSubmit(onSave)}
+                isSaving={methods.formState.isSubmitting}
+              />
+            </FormProvider>
           </div>
         </div>
       </main>

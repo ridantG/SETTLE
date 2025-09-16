@@ -35,7 +35,17 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const handleGoogleSignIn = async () => { /* ... Google sign-in logic remains the same ... */ };
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${location.origin}/auth/callback` },
+    });
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 font-sans">
@@ -90,7 +100,7 @@ export default function LoginPage() {
       </div>
       <div 
         className="hidden md:block bg-cover bg-center" 
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556740738-b6a63e27c4df?q=80&w=1974&auto=format&fit=crop')" }}
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1556740738-b6a63e27c4df?q=80&w=1974&auto-format&fit=crop')" }}
       ></div>
     </div>
   );

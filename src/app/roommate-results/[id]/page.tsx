@@ -1,108 +1,129 @@
-// src/app/roommate-results/[id]/page.tsx
+// File: app/roommate-results/page.tsx
+// FINAL, CORRECTED, AND COMPLETE VERSION
+// This is the main results page for Listers. It correctly integrates the
+// filter sidebar and displays a filterable grid of Seeker profiles.
 
-import { createClient } from '@/lib/supabase/server';
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState, useCallback } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import LoggedInHeader from "@/components/LoggedInHeader";
-import Image from 'next/image';
-import { FaCity, FaBriefcase, FaUniversity, FaGlassCheers, FaSmoking, FaUtensils } from 'react-icons/fa';
+import SeekerProfileCard from "@/components/seekerProfileCard";
+import EmptyState from "@/components/EmptyState";
+import FilterSidebar, { type Filters } from "@/components/FilterSidebar"; // Correctly import your component
+import { useRouter } from "next/navigation";
+import { type User } from "@supabase/supabase-js";
 
-// This is the crucial fix that solves the params and cookies errors
-export const dynamic = 'force-dynamic';
+export default function RoommateResultsPage() {
+    const supabase = createClient();
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+    const [profiles, setProfiles] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-export default async function ProfileDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', params.id)
-    .single();
+    const fetchSeekers = useCallback(async (currentUserId: string, filters: Filters) => {
+        setLoading(true);
+        let query = supabase
+            .from('profiles')
+            .select('*, preferences (budget)')
+            .eq('role', 'seeker')
+            .neq('id', currentUserId);
 
-  if (error || !profile) {
+        // Dynamically apply filters from the sidebar
+        if (filters.city.trim()) query = query.ilike('city', `%${filters.city.trim()}%`);
+        if (filters.drinks !== null) query = query.eq('drinks', filters.drinks);
+        if (filters.smokes !== null) query = query.eq('smokes', filters.smokes);
+        if (filters.diet) query = query.eq('diet', filters.diet);
+        if (filters.has_pets !== null) query = query.eq('has_pets', filters.has_pets);
+        
+        // Apply sorting
+        query = query.order(filters.sortBy, { 
+            ascending: filters.sortBy === 'preferences->>budget', 
+            nullsFirst: false 
+        });
+        
+        const { data, error } = await query;
+        if (error) {
+            toast.error("Could not load potential roommates.");
+            console.error("Fetch Error:", error);
+        } else {
+            setProfiles(data || []);
+        }
+        setLoading(false);
+    }, [supabase]);
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUser(user);
+                // Initial fetch with no filters
+                fetchSeekers(user.id, {} as Filters);
+            } else {
+                router.push('/login');
+            }
+        };
+        fetchInitialData();
+    }, [supabase, fetchSeekers, router]);
+
+    const handleApplyFilters = (filters: Filters) => {
+        if (user) {
+            fetchSeekers(user.id, filters);
+        }
+    };
+    
+    const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
+    
+    const handleLike = async (likedUserId: string) => {
+        const response = await fetch('/api/like', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ liked_id: likedUserId }) 
+        });
+        if (response.ok) {
+            const { matchCreated } = await response.json();
+            toast.success(matchCreated ? "It's a Match! You can now chat." : "Interest sent!");
+        } else { 
+            toast.error("Something went wrong."); 
+        }
+        handleAction(likedUserId);
+    };
+
     return (
-      <div className="min-h-screen bg-gray-50">
-        <LoggedInHeader />
-        <main className="text-center py-20">
-          <h1 className="text-2xl font-bold text-gray-700">Profile not found.</h1>
-        </main>
-      </div>
-    );
-  }
-
-  const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: string | number | boolean | null }) => (
-    <div className="flex items-center space-x-3 bg-gray-100 p-3 rounded-lg">
-      <div className="text-green-600 text-xl">{icon}</div>
-      <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="font-semibold text-gray-800">
-          {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : (value ?? 'N/A')}
-        </p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <LoggedInHeader />
-      <main className="max-w-4xl mx-auto py-12 px-4">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {/* --- Profile Header --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3">
-            <div className="md:col-span-1 p-8 flex flex-col items-center justify-center bg-gray-50">
-              <div className="relative w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-md">
-                <Image 
-                  src={profile.image_url || '/images/person1.jpg'} 
-                  alt={profile.name || 'Profile picture'}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <h1 className="text-3xl font-bold text-gray-800 mt-4">{profile.name}</h1>
-              <p className="text-lg text-gray-500">{profile.age ? `${profile.age} years old` : 'Age N/A'}</p>
-            </div>
-            <div className="md:col-span-2 p-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Details</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DetailItem icon={<FaCity />} label="City" value={profile.city} />
-                <DetailItem 
-                  icon={profile.status === 'Student' ? <FaUniversity /> : <FaBriefcase />}
-                  label={profile.status || 'Status'}
-                  value={profile.organization}
-                />
-                <DetailItem icon={<FaGlassCheers />} label="Drinks" value={profile.drinks} />
-                <DetailItem icon={<FaSmoking />} label="Smokes" value={profile.smokes} />
-                <DetailItem icon={<FaUtensils />} label="Diet" value={profile.diet} />
-              </div>
-            </div>
-          </div>
-
-          {/* --- Flat Photos Section --- */}
-          {profile.flat_image_urls && profile.flat_image_urls.length > 0 && (
-            <div className="p-8 border-t border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">The Space</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {profile.flat_image_urls.map((url: string, index: number) => (
-                  <div key={index} className="relative w-full h-40 rounded-lg overflow-hidden shadow-sm">
-                    <Image 
-                      src={url} 
-                      alt={`Flat photo ${index + 1}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* --- Description Section --- */}
-          {profile.description && (
-             <div className="p-8 border-t border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">About</h2>
-                <p className="text-gray-600 leading-relaxed">{profile.description}</p>
-             </div>
-          )}
+        <div className="min-h-screen bg-gray-50">
+            <Toaster position="top-center" />
+            <LoggedInHeader />
+            <main className="max-w-screen-xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Sidebar Column */}
+                    <FilterSidebar onApplyFilters={handleApplyFilters} isSeekerPage={false} />
+                    
+                    {/* Results Column */}
+                    <div className="w-full">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-8">Potential Roommates</h1>
+                        {loading ? (
+                            <p className="text-center text-gray-500 py-20">Finding potential roommates...</p>
+                        ) : profiles.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                                {profiles.map(profile => (
+                                    <SeekerProfileCard 
+                                        key={profile.id} 
+                                        profile={profile} 
+                                        onLike={handleLike} 
+                                        onDismiss={handleAction} 
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState 
+                                title="No Roommates Found" 
+                                message="Try adjusting your filters or check back later for new seekers." 
+                            />
+                        )}
+                    </div>
+                </div>
+            </main>
         </div>
-      </main>
-    </div>
-  );
+    );
 }

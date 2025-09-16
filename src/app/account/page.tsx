@@ -1,5 +1,3 @@
-// src/app/account/page.tsx
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import LoggedInHeader from '@/components/LoggedInHeader';
 import ImageUpload from '@/components/ImageUpload';
 import toast from 'react-hot-toast';
+import { type User } from '@supabase/supabase-js';
 
 // Define a type for the profile data to handle null values from the database
 type Profile = {
@@ -38,38 +37,40 @@ export default function AccountPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [profile, setProfile] = useState<Profile>(blankProfile); // Initialize with a blank, non-null object
+  const [profile, setProfile] = useState<Profile>(blankProfile);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [profileImagePath, setProfileImagePath] = useState<string | null>(null);
 
-  // Fetches the user's profile from the database
+  // The definitive authentication listener to prevent race conditions
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setUser(session.user);
+      } else {
+        router.push('/login');
+      }
+      setAuthReady(true);
+    });
+    return () => subscription.unsubscribe();
+  }, [router, supabase.auth]);
+
+  // The data fetching logic, now separate and dependent on the user being confirmed
   const getProfile = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
+    if (!user) return;
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (data) {
-      // If a profile exists, load its data into the form
       setProfile(data);
-    } else if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+    } else if (error && error.code !== 'PGRST116') {
       toast.error('Could not load profile data.');
     }
-    // If no profile is found (new user), the form will simply remain in its blank state.
-    // This prevents the page from getting stuck.
     setLoading(false);
-  }, [supabase, router]);
+  }, [user, supabase]);
 
   useEffect(() => {
-    getProfile();
-  }, [getProfile]);
-
+    if (user) getProfile();
+  }, [user, getProfile]);
+  
   // Handles changes in form inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setProfile({ ...profile, [e.target.id]: e.target.value });
@@ -81,8 +82,11 @@ export default function AccountPage() {
     setIsSaving(true);
     const toastId = toast.loading('Saving profile...');
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast.error("You must be logged in to update.");
+      setIsSaving(false);
+      return;
+    }
 
     let publicImageUrl = profile.image_url;
     if (profileImagePath) {
@@ -112,16 +116,14 @@ export default function AccountPage() {
 
   // Handles resetting the user's role
   const handleChangeRole = async () => {
-    const confirmation = window.confirm("Are you sure? This will reset your role and allow you to choose again from the dashboard.");
-    if (!confirmation) return;
+    if (!window.confirm("Are you sure? This will reset your role and you will need to choose again from the dashboard.")) return;
 
     const toastId = toast.loading('Resetting your role...');
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase
       .from('profiles')
-      .update({ user_role: null })
+      .update({ user_role: null }) // Set the role to null
       .eq('id', user.id);
     
     toast.dismiss(toastId);
@@ -129,11 +131,11 @@ export default function AccountPage() {
       toast.error(`Error: ${error.message}`);
     } else {
       toast.success('Your role has been reset.');
-      router.push('/dashboard');
+      router.push('/dashboard'); // Send user back to the choice page
     }
   };
 
-  if (loading) {
+  if (!authReady || loading) {
     return (
         <div className="min-h-screen bg-gray-50">
             <LoggedInHeader />

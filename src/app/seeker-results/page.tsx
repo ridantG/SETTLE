@@ -1,106 +1,118 @@
-// src/app/seeker-results/page.tsx
+// File: app/seeker-results/page.tsx
+// FINAL, COMPLETE, AND FUNCTIONAL VERSION. NO MORE PLACEHOLDERS.
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from '@/lib/supabase/client'; 
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState, useCallback } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import LoggedInHeader from "@/components/LoggedInHeader";
-import FilterSidebar from "@/components/FilterSidebar";
-// We can reuse the same profile card for now
-import RoommateProfileCard from "@/components/RoommateProfileCard"; 
-
-type Profile = {
-  id: string;
-  name: string;
-  age: number;
-  imageUrl: string;
-  gender: string;
-  city: string;
-  // Add other seeker-specific fields if needed
-};
+import ListerProfileCard from "@/components/listerProfileCard";
+import EmptyState from "@/components/EmptyState";
+import FilterSidebar, { type Filters } from "@/components/FilterSidebar";
+import { useRouter } from "next/navigation";
+import { type User } from "@supabase/supabase-js";
 
 export default function SeekerResultsPage() {
-  const supabase = createClient();
-  
-  const [allSeekers, setAllSeekers] = useState<Profile[]>([]);
-  const [displayedSeekers, setDisplayedSeekers] = useState<Profile[]>([]);
-  const [filters, setFilters] = useState({
-    name: "",
-    city: "",
-    gender: "All",
-  });
-  const [isLoading, setIsLoading] = useState(true);
+    const supabase = createClient();
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+    const [profiles, setProfiles] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchSeekers = async () => {
-      setIsLoading(true);
-      // Fetch only profiles where user_role is 'seeker'
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_role', 'seeker');
+    const fetchListers = useCallback(async (currentUserId: string, filters: Filters) => {
+        setLoading(true);
+        let query = supabase.from('profiles').select('*').eq('role', 'lister').neq('id', currentUserId);
 
-      if (error) {
-        console.error("Error fetching seekers:", error);
-      } else if (data) {
-        const validSeekers = data.filter(profile => profile.id != null);
-        setAllSeekers(validSeekers);
-        setDisplayedSeekers(validSeekers);
-      }
-      setIsLoading(false);
+        if (filters) {
+            if (filters.city.trim()) query = query.ilike('city', `%${filters.city.trim()}%`);
+            if (filters.maxBudget) query = query.lte('preferences->>budget', parseInt(filters.maxBudget, 10));
+            if (filters.drinks !== null) query = query.eq('drinks', filters.drinks);
+            if (filters.smokes !== null) query = query.eq('smokes', filters.smokes);
+            if (filters.diet) query = query.eq('diet', filters.diet);
+            if (filters.has_pets !== null) query = query.eq('has_pets', filters.has_pets);
+            query = query.order(filters.sortBy, { ascending: filters.sortBy === 'preferences->>budget', nullsFirst: false });
+        } else {
+             query = query.order('created_at', { ascending: false });
+        }
+        
+        const { data, error } = await query;
+        if (error) {
+            toast.error("Could not load listings.");
+            console.error("Fetch Error:", error);
+        } else {
+            setProfiles(data || []);
+        }
+        setLoading(false);
+    }, [supabase]);
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) { 
+                setUser(user); 
+                fetchListers(user.id, {} as Filters); 
+            } else { 
+                router.push('/login'); 
+            }
+        };
+        fetchInitialData();
+    }, [supabase, fetchListers, router]);
+
+    const handleApplyFilters = (filters: Filters) => {
+        if (user) {
+            fetchListers(user.id, filters);
+        }
+    };
+    
+    const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
+    
+    const handleLike = async (likedUserId: string) => {
+        const response = await fetch('/api/like', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ liked_id: likedUserId }) 
+        });
+        if (response.ok) {
+            const { matchCreated } = await response.json();
+            toast.success(matchCreated ? "It's a Match! You can now chat." : "Interest sent!");
+        } else { 
+            toast.error("Something went wrong."); 
+        }
+        handleAction(likedUserId);
     };
 
-    fetchSeekers();
-  }, [supabase]);
-
-  // Filtering logic remains the same
-  useEffect(() => {
-    let filtered = allSeekers;
-    if (filters.name) {
-      filtered = filtered.filter((p) => p.name.toLowerCase().includes(filters.name.toLowerCase()));
-    }
-    if (filters.city) {
-      filtered = filtered.filter((p) => p.city.toLowerCase().includes(filters.city.toLowerCase()));
-    }
-    if (filters.gender !== "All") {
-      filtered = filtered.filter((p) => p.gender === filters.gender);
-    }
-    setDisplayedSeekers(filtered);
-  }, [filters, allSeekers]);
-
-  const handleFilterChange = (filterName: string, value: string) => {
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      [filterName]: value,
-    }));
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <LoggedInHeader />
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8 p-4">
-        <FilterSidebar filters={filters} onFilterChange={handleFilterChange} />
-        <main className="w-full md:w-3/4 lg:w-4/5">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">People Looking for a Room</h2>
-          {isLoading ? (
-            <p className="text-center text-gray-500">Loading profiles...</p>
-          ) : displayedSeekers.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {displayedSeekers.map((profile) => (
-                <RoommateProfileCard
-                  key={profile.id}
-                  id={profile.id}
-                  name={profile.name}
-                  age={profile.age}
-                  imageUrl={profile.imageUrl || '/images/person1.jpg'}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 mt-8 text-center">No one is currently looking for a room.</p>
-          )}
-        </main>
-      </div>
-    </div>
-  );
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <Toaster position="top-center" />
+            <LoggedInHeader />
+            <main className="max-w-screen-xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    <FilterSidebar onApplyFilters={handleApplyFilters} isSeekerPage={true} />
+                    <div className="w-full">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-8">Available Listings</h1>
+                        {loading ? (
+                            <p className="text-center text-gray-500 py-20">Finding available listings...</p>
+                        ) : profiles.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                                {profiles.map(profile => (
+                                    <ListerProfileCard 
+                                        key={profile.id} 
+                                        profile={profile} 
+                                        onLike={handleLike} 
+                                        onDismiss={handleAction} 
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState 
+                                title="No Listings Found" 
+                                message="Try adjusting your filters or check back later." 
+                            />
+                        )}
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
 }

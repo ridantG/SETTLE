@@ -1,44 +1,35 @@
-// src/components/ChoiceCard.tsx
+// File: src/components/ChoiceCard.tsx
+// A reusable, professional component for displaying user choices on the dashboard.
 
-import Image from 'next/image';
-import Link from 'next/link';
+"use client";
 
+import React from 'react';
+
+// Define the props this component will accept
 type ChoiceCardProps = {
-  imageUrl: string;
-  title: string;
-  description: string;
-  buttonText: string;
-  href: string;
+    title: string;
+    description: string;
+    icon: React.ReactNode; // Allows passing SVG components as props
+    onClick: () => void;
+    colorTheme: 'green' | 'blue'; // To control the hover effect color
 };
 
-const ChoiceCard = ({ imageUrl, title, description, buttonText, href }: ChoiceCardProps) => {
-  return (
-    <Link href={href} className="block group"> 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row items-center w-full transition-shadow group-hover:shadow-lg">
-        {/* Image Section */}
-        <div className="md:w-1/3 w-full h-52 md:h-full relative">
-          {/* CORRECTED IMAGE COMPONENT */}
-          <Image 
-            src={imageUrl} 
-            alt={title} 
-            fill // Use the 'fill' prop
-            className="object-cover md:rounded-l-xl md:rounded-t-none rounded-t-xl" // Use Tailwind for object-fit
-          />
-        </div>
-        
-        {/* Content Section */}
-        <div className="p-6 md:w-2/3 flex-grow flex flex-col md:flex-row justify-between items-start md:items-center">
-          <div className="mb-4 md:mb-0 md:mr-4">
-            <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-            <p className="text-gray-600 mt-2">{description}</p>
-          </div>
-          <div className="bg-green-500 text-white font-bold py-2 px-6 rounded-lg group-hover:bg-green-600 transition-colors whitespace-nowrap">
-            {buttonText}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-};
+export default function ChoiceCard({ title, description, icon, onClick, colorTheme }: ChoiceCardProps) {
+    const hoverColorClass = colorTheme === 'green' ? 'hover:border-green-500' : 'hover:border-blue-500';
+    const groupHoverTextColorClass = colorTheme === 'green' ? 'group-hover:text-green-600' : 'group-hover:text-blue-600';
 
-export default ChoiceCard;
+    return (
+        <div 
+            onClick={onClick}
+            className={`p-8 rounded-xl shadow-lg border-2 border-gray-200 ${hoverColorClass} hover:shadow-2xl hover:scale-105 cursor-pointer transition-all duration-300 group`}
+        >
+            {icon}
+            <h2 className={`text-2xl font-bold text-gray-900 ${groupHoverTextColorClass} transition-colors`}>
+                {title}
+            </h2>
+            <p className="mt-2 text-gray-500">
+                {description}
+            </p>
+        </div>
+    );
+}

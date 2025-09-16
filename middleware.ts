@@ -40,6 +40,7 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // This is crucial for refreshing the user's session cookie on every request.
   await supabase.auth.getUser()
 
   return response

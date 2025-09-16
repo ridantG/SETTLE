@@ -44,7 +44,6 @@ export default function SignUpPage() {
     setLoading(true);
     const toastId = toast.loading('Verifying and creating account...');
 
-    // First, verify the OTP. This also signs the user in temporarily.
     const options = signUpMethod === 'email'
       ? { email: contactInfo, token: otp, type: 'email' as const }
       : { phone: contactInfo, token: otp, type: 'sms' as const };
@@ -58,8 +57,6 @@ export default function SignUpPage() {
       return;
     }
 
-    // If OTP is correct, the user is now authenticated.
-    // Now we can securely set their password.
     if (data.session) {
       const { error: updateError } = await supabase.auth.updateUser({ password: password });
 
@@ -77,7 +74,17 @@ export default function SignUpPage() {
     setLoading(false);
   };
   
-  const handleGoogleSignIn = async () => { /* ... Google sign-in logic remains the same ... */ };
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${location.origin}/auth/callback` },
+    });
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 font-sans">
@@ -138,7 +145,10 @@ export default function SignUpPage() {
           </div>
         </div>
       </div>
-      <div className="hidden md:block bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=2158&auto=format&fit=crop')" }}></div>
+      <div 
+        className="hidden md:block bg-cover bg-center" 
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=2158&auto=format&fit=crop')" }}
+      ></div>
     </div>
   );
 }

@@ -1,10 +1,9 @@
 // File: app/chat/[matchId]/ChatUI.tsx
-// FINAL, CORRECTED, AND COMPLETE VERSION
-// This version fixes the TypeScript 'alt' attribute error and is fully functional.
+// FINAL, OPTIMIZED VERSION: The Supabase client is now correctly memoized for performance.
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react'; // 1. Import useMemo
 import { type MessageWithAuthor } from './page';
 import { type User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
@@ -18,7 +17,9 @@ type ChatUIProps = {
 };
 
 export default function ChatUI({ initialMessages, otherUser, currentUser, matchId }: ChatUIProps) {
-    const supabase = createClient();
+    // 2. THE FIX IS HERE: The Supabase client instance is now memoized.
+    const supabase = useMemo(() => createClient(), []);
+    
     const [messages, setMessages] = useState(initialMessages);
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -86,7 +87,6 @@ export default function ChatUI({ initialMessages, otherUser, currentUser, matchI
                 <div className="bg-white p-4 border-b border-gray-200 flex items-center gap-4 sticky top-0">
                     <img 
                         src={otherUser.image_url || 'https://placehold.co/40x40'} 
-                        // THE FIX IS HERE: Provide a fallback string if the name is null.
                         alt={otherUser.name || 'Chat partner avatar'} 
                         className="w-10 h-10 rounded-full object-cover" 
                     />
@@ -100,13 +100,12 @@ export default function ChatUI({ initialMessages, otherUser, currentUser, matchI
                             {message.sender_id !== currentUser.id && (
                                 <img 
                                     src={message.profiles?.image_url || 'https://placehold.co/32x32'} 
-                                    // THE FIX IS HERE: Provide a fallback string if the name is null.
                                     alt={message.profiles?.name || 'User avatar'} 
                                     className="w-8 h-8 rounded-full object-cover" 
                                 />
                             )}
                             <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${message.sender_id === currentUser.id ? 'bg-green-500 text-white' : 'bg-white'}`}>
-                                <p>{message.content}</p>
+                                <p className="text-sm">{message.content}</p>
                             </div>
                         </div>
                     ))}

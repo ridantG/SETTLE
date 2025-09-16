@@ -1,10 +1,10 @@
 // File: app/roommate-results/page.tsx
-// FINAL, COMPLETE, AND FUNCTIONAL VERSION. NO MORE PLACEHOLDERS.
+// FINAL, CORRECTED VERSION: This page now correctly fetches and displays SEEKER profiles.
 
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import LoggedInHeader from "@/components/LoggedInHeader";
 import SeekerProfileCard from "@/components/seekerProfileCard";
@@ -14,26 +14,35 @@ import { useRouter } from "next/navigation";
 import { type User } from "@supabase/supabase-js";
 
 export default function RoommateResultsPage() {
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [profiles, setProfiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeFilters, setActiveFilters] = useState<Filters | null>(null);
 
     const fetchSeekers = useCallback(async (currentUserId: string, filters: Filters) => {
         setLoading(true);
-        let query = supabase.from('profiles').select('*').eq('role', 'seeker').neq('id', currentUserId);
 
-        if (filters) {
-            if (filters.city.trim()) query = query.ilike('city', `%${filters.city.trim()}%`);
-            if (filters.drinks !== null) query = query.eq('drinks', filters.drinks);
-            if (filters.smokes !== null) query = query.eq('smokes', filters.smokes);
-            if (filters.diet) query = query.eq('diet', filters.diet);
-            if (filters.has_pets !== null) query = query.eq('has_pets', filters.has_pets);
-            query = query.order(filters.sortBy, { ascending: filters.sortBy === 'preferences->>budget', nullsFirst: false });
-        } else {
-             query = query.order('created_at', { ascending: false });
+        // THE FIX IS HERE: This query now correctly fetches profiles where role = 'seeker'.
+        let query = supabase
+            .from('profiles')
+            .select('*')
+            .eq('role', 'seeker') // This is the critical line.
+            .neq('id', currentUserId);
+
+        if (filters?.city && typeof filters.city === 'string' && filters.city.trim() !== '') {
+            query = query.ilike('city', `%${filters.city.trim()}%`);
         }
+        if (filters?.drinks !== null) query = query.eq('drinks', filters.drinks);
+        if (filters?.smokes !== null) query = query.eq('smokes', filters.smokes);
+        if (filters?.diet) query = query.eq('diet', filters.diet);
+        if (filters?.has_pets !== null) query = query.eq('has_pets', filters.has_pets);
+        
+        query = query.order(filters?.sortBy || 'created_at', { 
+            ascending: filters?.sortBy === 'preferences->>budget', 
+            nullsFirst: false 
+        });
         
         const { data, error } = await query;
         if (error) {
@@ -46,26 +55,29 @@ export default function RoommateResultsPage() {
     }, [supabase]);
 
     useEffect(() => {
-        const fetchInitialData = async () => {
+        const fetchUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) { 
-                setUser(user); 
-                fetchSeekers(user.id, {} as Filters); 
+                setUser(user);
             } else { 
                 router.push('/login'); 
             }
         };
-        fetchInitialData();
-    }, [supabase, fetchSeekers, router]);
+        fetchUser();
+    }, [supabase, router]);
+
+    useEffect(() => {
+        if (user && activeFilters) {
+            fetchSeekers(user.id, activeFilters);
+        }
+    }, [user, activeFilters, fetchSeekers]);
 
     const handleApplyFilters = (filters: Filters) => {
-        if (user) {
-            fetchSeekers(user.id, filters);
-        }
+        setActiveFilters(filters);
     };
     
     const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
-
+    
     const handleLike = async (likedUserId: string) => {
         const response = await fetch('/api/like', { 
             method: 'POST', 
@@ -91,7 +103,10 @@ export default function RoommateResultsPage() {
                     <div className="w-full">
                         <h1 className="text-3xl font-bold text-gray-800 mb-8">Potential Roommates</h1>
                         {loading ? (
-                            <p className="text-center text-gray-500 py-20">Finding potential roommates...</p>
+                            <div className="text-center text-gray-500 py-20">
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                                <p className="mt-4">Finding potential roommates...</p>
+                            </div>
                         ) : profiles.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                                 {profiles.map(profile => (
@@ -106,7 +121,7 @@ export default function RoommateResultsPage() {
                         ) : (
                             <EmptyState 
                                 title="No Roommates Found" 
-                                message="Try adjusting your filters or check back later." 
+                                message="There are no seekers matching your criteria right now. Check back later!" 
                             />
                         )}
                     </div>

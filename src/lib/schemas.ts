@@ -1,10 +1,10 @@
-// This file is the single, definitive source of truth for the Profile data structure
-// and its validation rules. All other files will import from here.
+// File: lib/schemas.ts
+// This is the single, definitive source of truth for the Profile data structure.
 
+import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { type User } from "@supabase/supabase-js";
 
-// This is the master blueprint for a user profile.
+// We define the rules for a user's profile using Zod. This is our master blueprint.
 export const profileSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(['seeker', 'lister']).nullable(),
@@ -25,16 +25,20 @@ export const profileSchema = z.object({
   email: z.string().email().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
+  flags: z.number().optional() // Include the flags column
 });
 
 // We INFER the TypeScript type directly from the Zod schema.
 // They are now architecturally guaranteed to be in sync, forever.
 export type Profile = z.infer<typeof profileSchema>;
-
-// This defines the props for the OnboardingForm to ensure type safety.
 export type OnboardingFormProps = {
-    user: User;
-    profileData: Profile;
-    onSave: (data: Profile) => Promise<void>;
-    isSaving: boolean;
-};
+
+  user: User;
+
+  profileData: Profile;
+
+  onSave: (data: Profile) => Promise<void>;
+
+  isSaving: boolean;
+
+}

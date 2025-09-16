@@ -1,21 +1,21 @@
 // File: src/components/LoggedInHeader.tsx
-// FINAL, CORRECTED, AND COMPLETE VERSION
-// This version takes your existing, functional header and adds the "Tiffin Service" link.
+// FINAL, OPTIMIZED VERSION: The Supabase client is now correctly memoized for performance.
 
 "use client";
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react'; // <-- Step 1: Import useMemo
 import toast, { Toaster } from 'react-hot-toast';
 
-// New SVG Icon for the Tiffin Service link
+// --- SVG Icon Components ---
 const TiffinIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>;
 const ChatIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>;
 const ForumIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
 const ProfileIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
+// --- Reusable Modal Component ---
 const ConfirmationModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, onClose: () => void, onConfirm: () => void }) => {
     if (!isOpen) return null;
     return (
@@ -32,9 +32,12 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, on
     );
 };
 
+// --- Main Header Component ---
 export default function LoggedInHeader() {
     const router = useRouter();
-    const supabase = createClient();
+    // THE FIX IS HERE: The Supabase client instance is now memoized for performance and stability.
+    const supabase = useMemo(() => createClient(), []);
+    
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -76,7 +79,6 @@ export default function LoggedInHeader() {
                 <nav className="max-w-7xl mx-auto flex justify-between items-center">
                     <Link href="/dashboard" className="text-3xl font-bold text-gray-800 tracking-wider"><span className="text-green-600">Set</span>tle</Link>
                     <div className="flex items-center space-x-6">
-                        {/* THE EDIT IS HERE: The new "Tiffin Service" link is added. */}
                         <Link href="/tiffin" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
                             <TiffinIcon />
                             <span className="font-medium">Tiffin Service</span>
@@ -109,4 +111,3 @@ export default function LoggedInHeader() {
         </>
     );
 }
-

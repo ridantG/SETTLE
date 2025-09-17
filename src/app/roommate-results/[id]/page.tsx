@@ -1,128 +1,96 @@
-// File: app/roommate-results/page.tsx
-// FINAL, CORRECTED, AND COMPLETE VERSION
-// This is the main results page for Listers. It correctly integrates the
-// filter sidebar and displays a filterable grid of Seeker profiles.
+// File: app/roommate-results/[id]/page.tsx
+// FINAL, CORRECTED VERSION: With fully implemented action buttons.
 
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import LoggedInHeader from "@/components/LoggedInHeader";
-import SeekerProfileCard from "@/components/seekerProfileCard";
-import EmptyState from "@/components/EmptyState";
-import FilterSidebar, { type Filters } from "@/components/FilterSidebar"; // Correctly import your component
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { type User } from "@supabase/supabase-js";
 
-export default function RoommateResultsPage() {
-    const supabase = createClient();
+const CompatibilityScore = ({ score }: { score: number }) => {
+    const color = score > 70 ? 'text-green-500' : score > 40 ? 'text-yellow-500' : 'text-red-500';
+    const ringColor = score > 70 ? 'ring-green-500' : score > 40 ? 'ring-yellow-500' : 'ring-red-500';
+    return (<div className={`relative h-24 w-24 rounded-full flex flex-col items-center justify-center bg-gray-50 shadow-inner ring-4 ring-offset-4 ring-offset-gray-50 ${ringColor}`}><span className={`font-bold text-4xl ${color}`}>{score}</span><span className="text-xs text-gray-500 font-semibold -mt-1">% Match</span></div>);
+};
+
+export default function SeekerDetailPage() {
+    const supabase = useMemo(() => createClient(), []);
+    const params = useParams();
     const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
-    const [profiles, setProfiles] = useState<any[]>([]);
+    const profileId = params.id as string;
+    
+    const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [compatibilityScore, setCompatibilityScore] = useState<number>(0);
 
-    const fetchSeekers = useCallback(async (currentUserId: string, filters: Filters) => {
-        setLoading(true);
-        let query = supabase
-            .from('profiles')
-            .select('*, preferences (budget)')
-            .eq('role', 'seeker')
-            .neq('id', currentUserId);
-
-        // Dynamically apply filters from the sidebar
-        if (filters.city.trim()) query = query.ilike('city', `%${filters.city.trim()}%`);
-        if (filters.drinks !== null) query = query.eq('drinks', filters.drinks);
-        if (filters.smokes !== null) query = query.eq('smokes', filters.smokes);
-        if (filters.diet) query = query.eq('diet', filters.diet);
-        if (filters.has_pets !== null) query = query.eq('has_pets', filters.has_pets);
-        
-        // Apply sorting
-        query = query.order(filters.sortBy, { 
-            ascending: filters.sortBy === 'preferences->>budget', 
-            nullsFirst: false 
-        });
-        
-        const { data, error } = await query;
-        if (error) {
-            toast.error("Could not load potential roommates.");
-            console.error("Fetch Error:", error);
-        } else {
-            setProfiles(data || []);
+    const getProfileData = useCallback(async (currentUserId: string) => {
+        if (!profileId || !currentUserId) return setLoading(false);
+        const { data: profileData, error: profileError } = await supabase.from('profiles').select('*, preferences (budget, city)').eq('id', profileId).single();
+        if (profileError) {
+            toast.error("Could not load this profile.");
+            setLoading(false);
+            return;
         }
+        setProfile(profileData);
+        const { data: scoreData, error: scoreError } = await supabase.rpc('calculate_compatibility', { user1_id: currentUserId, user2_id: profileId });
+        if (!scoreError) setCompatibilityScore(scoreData);
         setLoading(false);
-    }, [supabase]);
-
+    }, [supabase, profileId]);
+    
     useEffect(() => {
         const fetchInitialData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setUser(user);
-                // Initial fetch with no filters
-                fetchSeekers(user.id, {} as Filters);
-            } else {
-                router.push('/login');
-            }
+            if (user) getProfileData(user.id);
+            else router.push('/login');
         };
         fetchInitialData();
-    }, [supabase, fetchSeekers, router]);
+    }, [getProfileData, router, supabase.auth]);
 
-    const handleApplyFilters = (filters: Filters) => {
-        if (user) {
-            fetchSeekers(user.id, filters);
-        }
+    const handleReportUser = async () => {
+        setIsProcessing(true);
+        const toastId = toast.loading("Submitting report...");
+        const response = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reported_user_id: profileId }) });
+        const data = await response.json();
+        toast.dismiss(toastId);
+        if (response.ok) toast.success(data.message || "Report submitted.");
+        else toast.error(data.error || "Failed to submit report.");
+        setIsProcessing(false);
     };
-    
-    const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
-    
-    const handleLike = async (likedUserId: string) => {
-        const response = await fetch('/api/like', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ liked_id: likedUserId }) 
-        });
+
+    const handleLike = async () => {
+        setIsProcessing(true);
+        const toastId = toast.loading("Sending interest...");
+        const response = await fetch('/api/like', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ liked_id: profileId }) });
+        toast.dismiss(toastId);
         if (response.ok) {
             const { matchCreated } = await response.json();
             toast.success(matchCreated ? "It's a Match! You can now chat." : "Interest sent!");
-        } else { 
-            toast.error("Something went wrong."); 
+        } else {
+            toast.error("Could not send interest.");
         }
-        handleAction(likedUserId);
+        setIsProcessing(false);
     };
 
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><p>Loading profile...</p></div>;
+    if (!profile) return <div className="min-h-screen flex items-center justify-center"><p>Profile not found.</p></div>;
+
     return (
-        <div className="min-h-screen bg-gray-50">
-            <Toaster position="top-center" />
-            <LoggedInHeader />
-            <main className="max-w-screen-xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col lg:flex-row gap-8">
-                    {/* Sidebar Column */}
-                    <FilterSidebar onApplyFilters={handleApplyFilters} isSeekerPage={false} />
-                    
-                    {/* Results Column */}
-                    <div className="w-full">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-8">Potential Roommates</h1>
-                        {loading ? (
-                            <p className="text-center text-gray-500 py-20">Finding potential roommates...</p>
-                        ) : profiles.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                                {profiles.map(profile => (
-                                    <SeekerProfileCard 
-                                        key={profile.id} 
-                                        profile={profile} 
-                                        onLike={handleLike} 
-                                        onDismiss={handleAction} 
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <EmptyState 
-                                title="No Roommates Found" 
-                                message="Try adjusting your filters or check back later for new seekers." 
-                            />
-                        )}
+        <div className="min-h-screen bg-gray-100">
+            <Toaster position="top-center" /><LoggedInHeader />
+            <main className="max-w-4xl mx-auto py-12 px-4">
+                 <div className="bg-white rounded-2xl shadow-xl p-10">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                        <div className="md:col-span-1 flex flex-col items-center text-center space-y-6"><img src={profile.image_url || 'https://placehold.co/150x150'} alt={profile.name || 'User profile'} className="w-40 h-40 rounded-full object-cover border-4 border-white shadow-lg"/><div><h1 className="text-3xl font-bold text-gray-800">{profile.name}, {profile.age}</h1><p className="text-gray-500 text-lg mt-1">{profile.status} at {profile.organization}</p></div></div>
+                        <div className="md:col-span-2 flex flex-col items-center justify-center"><CompatibilityScore score={compatibilityScore} /></div>
                     </div>
-                </div>
+                    <div className="mt-10 border-t border-gray-200 pt-8"><h2 className="text-2xl font-bold text-gray-800 text-center">About Me</h2><p className="text-gray-600 mt-4 text-center max-w-2xl mx-auto whitespace-pre-wrap">{profile.description || "No description provided."}</p></div>
+                    <div className="mt-8 border-t border-gray-200 pt-8"><h3 className="text-xl font-semibold text-center text-gray-700">Lifestyle & Preferences</h3><div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6 text-center"><div><strong className="text-gray-500 block">Budget</strong> ₹{profile.preferences?.budget?.toLocaleString() || 'N/A'}</div><div><strong className="text-gray-500 block">Diet</strong> {profile.diet || 'N/A'}</div><div><strong className="text-gray-500 block">Drinks</strong> {profile.drinks ? 'Yes' : 'No'}</div><div><strong className="text-gray-500 block">Smokes</strong> {profile.smokes ? 'Yes' : 'No'}</div></div></div>
+                    <div className="bg-gray-50 p-6  border-t rounded-b-2xl -m-10 mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"><button onClick={handleLike} disabled={isProcessing} className="w-full sm:w-auto px-8 py-3 bg-green-500 text-white font-semibold rounded-full hover:bg-green-600 disabled:opacity-50">Show Interest</button><button onClick={handleReportUser} disabled={isProcessing} className="text-sm text-gray-500 hover:text-red-600 hover:underline disabled:opacity-50">Report this user</button></div>
+                 </div>
             </main>
         </div>
     );

@@ -1,3 +1,6 @@
+// File: app/seeker-results/page.tsx
+// FINAL, COMPLETE, AND FUNCTIONAL VERSION.
+
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +20,7 @@ export default function SeekerResultsPage() {
     const [profiles, setProfiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeFilters, setActiveFilters] = useState<Filters | null>(null);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const fetchListers = useCallback(async (currentUserId: string, filters: Filters) => {
         setLoading(true);
@@ -39,7 +43,6 @@ export default function SeekerResultsPage() {
         const { data, error } = await query;
         if (error) {
             toast.error("Could not load listings.");
-            console.error("Fetch Error:", error);
         } else {
             setProfiles(data || []);
         }
@@ -59,7 +62,6 @@ export default function SeekerResultsPage() {
     }, [supabase, router]);
 
     useEffect(() => {
-        // This effect acts as a gatekeeper, waiting for both the user and filters.
         if (user && activeFilters) {
             fetchListers(user.id, activeFilters);
         }
@@ -69,9 +71,12 @@ export default function SeekerResultsPage() {
         setActiveFilters(filters);
     };
     
-    const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
+    const handleDismiss = (profileId: string) => {
+        setProfiles(prev => prev.filter(p => p.id !== profileId));
+    };
     
     const handleLike = async (likedUserId: string) => {
+        setProcessingId(likedUserId);
         const response = await fetch('/api/like', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -80,10 +85,11 @@ export default function SeekerResultsPage() {
         if (response.ok) {
             const { matchCreated } = await response.json();
             toast.success(matchCreated ? "It's a Match! You can now chat." : "Interest sent!");
+            setProfiles(prev => prev.filter(p => p.id !== likedUserId));
         } else { 
             toast.error("Something went wrong."); 
         }
-        handleAction(likedUserId);
+        setProcessingId(null);
     };
 
     return (
@@ -107,7 +113,8 @@ export default function SeekerResultsPage() {
                                         key={profile.id} 
                                         profile={profile} 
                                         onLike={handleLike} 
-                                        onDismiss={handleAction} 
+                                        onDismiss={handleDismiss} 
+                                        isProcessing={processingId === profile.id}
                                     />
                                 ))}
                             </div>

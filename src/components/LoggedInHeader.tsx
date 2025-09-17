@@ -1,15 +1,16 @@
 // File: src/components/LoggedInHeader.tsx
-// FINAL, OPTIMIZED VERSION: The Supabase client is now correctly memoized for performance.
+// This is the definitive, complete, and functional header for your application.
 
 "use client";
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useState, useEffect, useRef, useMemo } from 'react'; // <-- Step 1: Import useMemo
+import { useState, useEffect, useRef, useMemo } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 // --- SVG Icon Components ---
+const HeartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.5l1.318-1.182a4.5 4.5 0 116.364 6.364L12 20.25l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>;
 const TiffinIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>;
 const ChatIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>;
 const ForumIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
@@ -35,9 +36,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, on
 // --- Main Header Component ---
 export default function LoggedInHeader() {
     const router = useRouter();
-    // THE FIX IS HERE: The Supabase client instance is now memoized for performance and stability.
     const supabase = useMemo(() => createClient(), []);
-    
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -75,13 +74,15 @@ export default function LoggedInHeader() {
     return (
         <>
             <Toaster position="top-center" />
-            <header className="bg-white shadow-md p-4 sticky top-0 z-40">
+            <header className="bg-white shadow-sm p-4 sticky top-0 z-40">
                 <nav className="max-w-7xl mx-auto flex justify-between items-center">
-                    <Link href="/dashboard" className="text-3xl font-bold text-gray-800 tracking-wider"><span className="text-green-600">Set</span>tle</Link>
+                    <Link href="/dashboard" className="text-3xl font-bold text-gray-800 tracking-wider">
+                        <span className="text-green-600">Set</span>tle
+                    </Link>
                     <div className="flex items-center space-x-6">
-                        <Link href="/tiffin" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
-                            <TiffinIcon />
-                            <span className="font-medium">Tiffin Service</span>
+                        <Link href="/likes-you" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
+                            <HeartIcon />
+                            <span className="font-medium">Likes</span>
                         </Link>
                         <Link href="/chat" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
                             <ChatIcon />
@@ -91,8 +92,14 @@ export default function LoggedInHeader() {
                             <ForumIcon />
                             <span className="font-medium">Forum</span>
                         </Link>
+                        <Link href="/tiffin" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
+                            <TiffinIcon />
+                            <span className="font-medium">Tiffin</span>
+                        </Link>
                         <div className="relative" ref={dropdownRef}>
-                            <button onClick={() => setIsDropdownOpen(prev => !prev)} className="text-gray-600 hover:text-green-600 focus:outline-none"><ProfileIcon /></button>
+                            <button onClick={() => setIsDropdownOpen(prev => !prev)} className="text-gray-600 hover:text-green-600 focus:outline-none">
+                                <ProfileIcon />
+                            </button>
                             {isDropdownOpen && (
                                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl py-2 z-50 border border-gray-200">
                                     <Link href="/preferences" className="block px-4 py-2 text-gray-700 hover:bg-gray-100" onClick={() => setIsDropdownOpen(false)}>My Profile</Link>

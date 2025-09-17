@@ -1,5 +1,5 @@
 // File: app/roommate-results/page.tsx
-// FINAL, CORRECTED VERSION: This page now correctly fetches and displays SEEKER profiles.
+// FINAL, COMPLETE, AND FUNCTIONAL VERSION.
 
 "use client";
 
@@ -20,16 +20,11 @@ export default function RoommateResultsPage() {
     const [profiles, setProfiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeFilters, setActiveFilters] = useState<Filters | null>(null);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const fetchSeekers = useCallback(async (currentUserId: string, filters: Filters) => {
         setLoading(true);
-
-        // THE FIX IS HERE: This query now correctly fetches profiles where role = 'seeker'.
-        let query = supabase
-            .from('profiles')
-            .select('*')
-            .eq('role', 'seeker') // This is the critical line.
-            .neq('id', currentUserId);
+        let query = supabase.from('profiles').select('*').eq('role', 'seeker').neq('id', currentUserId);
 
         if (filters?.city && typeof filters.city === 'string' && filters.city.trim() !== '') {
             query = query.ilike('city', `%${filters.city.trim()}%`);
@@ -47,7 +42,6 @@ export default function RoommateResultsPage() {
         const { data, error } = await query;
         if (error) {
             toast.error("Could not load potential roommates.");
-            console.error("Fetch Error:", error);
         } else {
             setProfiles(data || []);
         }
@@ -76,9 +70,12 @@ export default function RoommateResultsPage() {
         setActiveFilters(filters);
     };
     
-    const handleAction = (profileId: string) => setProfiles(prev => prev.filter(p => p.id !== profileId));
+    const handleDismiss = (profileId: string) => {
+        setProfiles(prev => prev.filter(p => p.id !== profileId));
+    };
     
     const handleLike = async (likedUserId: string) => {
+        setProcessingId(likedUserId);
         const response = await fetch('/api/like', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
@@ -87,10 +84,11 @@ export default function RoommateResultsPage() {
         if (response.ok) {
             const { matchCreated } = await response.json();
             toast.success(matchCreated ? "It's a Match! You can now chat." : "Interest sent!");
+            setProfiles(prev => prev.filter(p => p.id !== likedUserId));
         } else { 
             toast.error("Something went wrong."); 
         }
-        handleAction(likedUserId);
+        setProcessingId(null);
     };
 
     return (
@@ -114,14 +112,15 @@ export default function RoommateResultsPage() {
                                         key={profile.id} 
                                         profile={profile} 
                                         onLike={handleLike} 
-                                        onDismiss={handleAction} 
+                                        onDismiss={handleDismiss} 
+                                        isProcessing={processingId === profile.id}
                                     />
                                 ))}
                             </div>
                         ) : (
                             <EmptyState 
                                 title="No Roommates Found" 
-                                message="There are no seekers matching your criteria right now. Check back later!" 
+                                message="Try adjusting your filters or check back later for new seekers." 
                             />
                         )}
                     </div>

@@ -1,15 +1,13 @@
 // File: eslint.config.mjs
-// FINAL, DEFINITIVE, AND MODERN VERSION
-// This version uses the new, recommended "flat config" array syntax,
-// which eliminates the deprecation warning and is the professional standard.
-
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import nextPlugin from "eslint-plugin-next";
 import pluginTailwind from "eslint-plugin-tailwindcss";
+import path from "path";
 
 export default [
   {
-    // This applies global browser and Node.js variables.
+    // ✅ Add global browser & Node.js variables
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -18,14 +16,30 @@ export default [
     },
   },
 
-  // This is the core configuration for TypeScript files.
-  // We use the spread operator '...' to include all the recommended rules.
+  // ✅ Add TypeScript recommended rules
   ...tseslint.configs.recommended,
 
-  // This is the configuration for Tailwind CSS class sorting and validation.
+  // ✅ Add Next.js recommended rules (removes the warning)
+  {
+    plugins: {
+      next: nextPlugin,
+    },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+    },
+  },
+
+  // ✅ TailwindCSS Plugin Configuration
   {
     plugins: {
       tailwindcss: pluginTailwind,
+    },
+    settings: {
+      tailwindcss: {
+        // ⬇️ Tailwind v4 has no config by default, so we point it to PostCSS
+        // OR you can just leave this null to use defaults
+        config: path.join(process.cwd(), "postcss.config.mjs"),
+      },
     },
     rules: {
       "tailwindcss/classnames-order": "warn",
@@ -34,7 +48,7 @@ export default [
     },
   },
 
-  // This section ignores files that we don't want to lint.
+  // ✅ Ignore build and vendor folders
   {
     ignores: [".next/", "dist/", "node_modules/"],
   },

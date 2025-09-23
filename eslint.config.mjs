@@ -1,54 +1,35 @@
 // File: eslint.config.mjs
+// FINAL, CORRECTED VERSION using the official Next.js plugin
+
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import nextPlugin from "eslint-plugin-next";
 import pluginTailwind from "eslint-plugin-tailwindcss";
-import path from "path";
+import nextPlugin from "@next/eslint-plugin-next"; // The correct import
 
 export default [
   {
-    // ✅ Add global browser & Node.js variables
     languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+      globals: { ...globals.browser, ...globals.node },
     },
   },
-
-  // ✅ Add TypeScript recommended rules
   ...tseslint.configs.recommended,
-
-  // ✅ Add Next.js recommended rules (removes the warning)
   {
+    // This is the correct, modern way to include the Next.js plugin
     plugins: {
-      next: nextPlugin,
+      "@next/next": nextPlugin,
     },
     rules: {
       ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
     },
   },
-
-  // ✅ TailwindCSS Plugin Configuration
   {
-    plugins: {
-      tailwindcss: pluginTailwind,
-    },
-    settings: {
-      tailwindcss: {
-        // ⬇️ Tailwind v4 has no config by default, so we point it to PostCSS
-        // OR you can just leave this null to use defaults
-        config: path.join(process.cwd(), "postcss.config.mjs"),
-      },
-    },
+    plugins: { tailwindcss: pluginTailwind },
     rules: {
       "tailwindcss/classnames-order": "warn",
       "tailwindcss/no-custom-classname": "warn",
-      "tailwindcss/no-contradicting-classname": "error",
     },
   },
-
-  // ✅ Ignore build and vendor folders
   {
     ignores: [".next/", "dist/", "node_modules/"],
   },

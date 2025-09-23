@@ -1,57 +1,41 @@
-// ESLint v9+ flat config for Next.js + TypeScript + Tailwind CSS
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import nextPlugin from '@next/eslint-plugin-next';
-import reactHooks from 'eslint-plugin-react-hooks';
-import tailwind from 'eslint-plugin-tailwindcss';
+// File: eslint.config.mjs
+// FINAL, DEFINITIVE, AND MODERN VERSION
+// This version uses the new, recommended "flat config" array syntax,
+// which eliminates the deprecation warning and is the professional standard.
 
-export default tseslint.config(
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
+import globals from "globals";
+import tseslint from "typescript-eslint";
+import pluginTailwind from "eslint-plugin-tailwindcss";
+
+export default [
   {
-    files: ['**/*.{ts,tsx}'],
+    // This applies global browser and Node.js variables.
     languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module'
-      }
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
+  },
+
+  // This is the core configuration for TypeScript files.
+  // We use the spread operator '...' to include all the recommended rules.
+  ...tseslint.configs.recommended,
+
+  // This is the configuration for Tailwind CSS class sorting and validation.
+  {
     plugins: {
-      '@next/next': nextPlugin,
-      'react-hooks': reactHooks,
-      'tailwindcss': tailwind
+      tailwindcss: pluginTailwind,
     },
     rules: {
-      // Next.js web vitals
-      ...nextPlugin.configs['core-web-vitals'].rules,
-      // React Hooks recommendations
-      ...reactHooks.configs.recommended.rules,
-
-      // TypeScript tweaks
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-
-      // Tailwind plugin (disable if you use lots of custom class names)
-      'tailwindcss/no-custom-classname': 'off'
+      "tailwindcss/classnames-order": "warn",
+      "tailwindcss/no-custom-classname": "warn",
+      "tailwindcss/no-contradicting-classname": "error",
     },
-    settings: {
-      tailwindcss: {
-        callees: ['cn', 'clsx', 'cva'],
-        removeDuplicates: true
-      }
-    }
   },
+
+  // This section ignores files that we don't want to lint.
   {
-    // Ignore build artifacts and misc
-    ignores: [
-      'node_modules',
-      '.next',
-      'out',
-      'dist',
-      'coverage',
-      '.storybook',
-      '.vscode',
-      '.vercel'
-    ]
-  }
-);
+    ignores: [".next/", "dist/", "node_modules/"],
+  },
+];

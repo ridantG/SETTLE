@@ -1,43 +1,48 @@
-// File: lib/supabase/server.ts
-// FINAL, CORRECTED, AND COMPLETE VERSION
-// This version correctly uses 'await' to get the cookies,
-// fixing the "Property 'get' does not exist on type 'Promise'" error.
 
+
+import { NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 
-// This is the definitive, working server client for your application.
-export const createClient = () => {
-  // THE FIX IS HERE: The cookies() function is now correctly awaited.
-  const cookieStore = cookies();
+export async function DELETE(request: Request) {
+    const cookieStore = await cookies();
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value, ...options });
-          } catch (error) {
-            // The `set` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
-            // The `delete` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
-          }
-        },
-      },
+    // Create a client to safely get the user from their cookie.
+    const supabaseUserClient = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value;
+                },
+            },
+        }
+    );
+    
+    // Get the user from the secure, http-only cookie.
+    const { data: { user }, error: authError } = await supabaseUserClient.auth.getUser();
+    
+    if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-  );
-};
+
+    // Create a special admin client with the secret service_role key to perform deletion.
+    const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } }
+    );
+
+    // Use the admin client to delete the user from the auth system.
+    // The ON DELETE CASCADE rule in your database will handle deleting their profile, posts, etc.
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+
+    if (deleteError) {
+        console.error('Error deleting user:', deleteError);
+        return NextResponse.json({ error: 'A server error occurred. Could not delete your account.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: 'Account deleted successfully.' });
+}

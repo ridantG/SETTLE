@@ -1,17 +1,15 @@
 // File: lib/schemas.ts
 // This is the single, definitive source of truth for the Profile data structure.
-
-import { User } from '@supabase/supabase-js';
 import { z } from 'zod';
 
-// We define the rules for a user's profile using Zod. This is our master blueprint.
+// Zod schema for the multi-step form's data
 export const profileSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(['seeker', 'lister']).nullable(),
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }).nullable(),
-  age: z.coerce.number().min(18, { message: "You must be at least 18." }).nullable(),
-  gender: z.string().nullable(),
-  city: z.string().nullable(),
+  name: z.string().min(2, "Name is required").nullable(),
+  age: z.coerce.number().min(18, "Must be 18+").nullable(),
+  gender: z.enum(['male', 'female']).nullable(),
+  city: z.string().min(2, "City is required").nullable(),
   status: z.string().nullable(),
   organization: z.string().nullable(),
   diet: z.string().nullable(),
@@ -25,20 +23,17 @@ export const profileSchema = z.object({
   email: z.string().email().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
-  flags: z.number().optional() // Include the flags column
+  agreed_to_conduct: z.boolean().optional(),
 });
 
-// We INFER the TypeScript type directly from the Zod schema.
-// They are now architecturally guaranteed to be in sync, forever.
+// We infer the TypeScript type directly from the schema.
 export type Profile = z.infer<typeof profileSchema>;
-export type OnboardingFormProps = {
 
-  user: User;
-
-  profileData: Profile;
-
-  onSave: (data: Profile) => Promise<void>;
-
-  isSaving: boolean;
-
-}
+// A simpler schema for the initial, basic onboarding
+export const onboardingSchema = z.object({
+  name: z.string().min(2, { message: "Name is required." }),
+  age: z.coerce.number().min(18, { message: "You must be at least 18." }),
+  gender: z.enum(['male', 'female']), // Simple, correct enum
+  city: z.string().min(2, { message: "City is required." }),
+});
+export type OnboardingSchema = z.infer<typeof onboardingSchema>;

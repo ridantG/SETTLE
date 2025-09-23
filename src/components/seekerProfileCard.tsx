@@ -4,7 +4,7 @@
 "use client";
 
 import React from 'react';
-import Link from 'next/link';
+import Link from 'next/link'; // Import Link
 
 type Profile = { id: string; name: string | null; age: number | null; image_url: string | null; organization: string | null; status: string | null; description: string | null; preferences: { budget?: number; city?: string } | null; compatibility_score?: number; };
 type CardProps = { profile: Profile; onLike: (profileId: string) => void; onDismiss: (profileId: string) => void; isProcessing: boolean; };

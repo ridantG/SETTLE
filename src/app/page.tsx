@@ -4,6 +4,7 @@
 "use client";
 
 import { createClient } from '@/lib/supabase/client';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react'; // <-- THE FIX IS HERE
 
@@ -65,7 +66,7 @@ export default function LandingPage() {
                     Welcome to Settle
                 </h2>
                 <p className="mt-2 text-lg text-gray-500">
-                    Find Your Place. Find Your People.
+                    Find Your Place Find Your People and everything.
                 </p>
 
                 <div className="mt-10">
@@ -101,6 +102,11 @@ export default function LandingPage() {
                     <h3 className="mt-4 font-bold text-lg">Seamless Communication</h3>
                     <p className="mt-1 text-sm text-gray-600">Chat with your matches directly on our secure platform.</p>
                 </div>
+                <div className="mt-8 text-center">
+    <Link href="/admin/login" className="text-sm text-gray-500 hover:text-green-600 hover:underline">
+        Admin Login
+    </Link>
+</div>
             </div>
         </div>
     );

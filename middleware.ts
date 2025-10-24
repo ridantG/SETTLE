@@ -1,38 +1,67 @@
+// File: middleware.ts
+// FINAL, DEFINITIVE, AND SECURE VERSION
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
   const { supabase, response } = createClient(request);
 
+  // This line is crucial for keeping the user's session refreshed.
   const { data: { session } } = await supabase.auth.getSession();
+
   const { pathname } = request.nextUrl;
 
-  const protectedRoutes = [ '/dashboard', '/preferences', '/seeker-results', '/roommate-results', '/chat', '/forum', '/likes-you', '/tiffin' ];
+  // --- Admin Route Protection ---
+  // This logic protects all routes starting with /admin
+  if (pathname.startsWith('/admin')) {
+    // If no one is logged in, redirect to the admin login page.
+    if (!session) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
 
-  // If the user is not logged in and is trying to access a protected route, redirect to landing.
-  if (!session && protectedRoutes.some(prefix => pathname.startsWith(prefix))) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
-  // THE FIX IS HERE: The new "Onboarding Gatekeeper" logic
-  if (session) {
-    // Fetch the user's profile role
+    // If someone is logged in, check if they are an admin.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('is_admin')
       .eq('id', session.user.id)
       .single();
-
-    // If the user is logged in but has NOT completed onboarding (no role),
-    // and they are not already on the onboarding page, force them to it.
-    if (!profile?.role && pathname !== '/onboarding') {
-      return NextResponse.redirect(new URL('/onboarding', request.url));
+    
+    // If they are NOT an admin, sign them out and redirect to the main page for security.
+    if (!profile?.is_admin) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
+  // --- Regular User Logic ---
+  if (session) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin, role')
+      .eq('id', session.user.id)
+      .single();
+      
+    // If a logged-in user is an admin, always ensure they are in the admin area.
+    // This prevents them from being redirected to the user dashboard.
+    if (profile?.is_admin && !pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
+  }
+  
   return response;
 }
 
 export const config = {
-  matcher: [ '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)', ],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - api/ (API routes)
+     * - auth/ (Supabase callback route)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|api/|auth/).*)',
+  ],
 };

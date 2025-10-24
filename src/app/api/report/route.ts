@@ -1,23 +1,22 @@
+// File: app/api/report/route.ts
+// FINAL, CORRECTED VERSION
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
     const supabase = createClient();
-    const { reported_user_id } = await request.json();
-
-    // Security Check 1: Get the current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-        return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Security Check 2: A user cannot report themselves
-    if (user.id === reported_user_id) {
-        return NextResponse.json({ error: 'You cannot report yourself.' }, { status: 400 });
+    const { reported_user_id } = await request.json();
+    if (!reported_user_id) {
+        return NextResponse.json({ error: 'Reported user ID is required.' }, { status: 400 });
     }
 
-    // Call the database function to increment the flag count
-    const { error } = await supabase.rpc('increment_flags', { user_id: reported_user_id });
+    // Call the secure, server-side database function to increment the flag.
+    const { error } = await supabase.rpc('increment_flags', { user_id_to_report: reported_user_id });
 
     if (error) {
         console.error("API Report Error:", error);

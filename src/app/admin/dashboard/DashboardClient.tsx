@@ -29,12 +29,18 @@ export default function DashboardClient({ dashboardData }: { dashboardData: any 
     return (
         <>
             <h2 className="text-3xl font-bold mb-6 text-gray-900">Dashboard</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <StatCard title="Open Reports" value={dashboardData.openReports} icon={<ReportIcon />} link="/admin/reports" />
                 <StatCard title="New Users (24h)" value={dashboardData.newUsers} icon={<NewUserIcon />} link="/admin/users?new=true" />
-                <StatCard title="Total Active Users" value={dashboardData.totalUsers} icon={<TotalUsersIcon />} link="/admin/users" />
+                <StatCard title="Total Users" value={dashboardData.totalUsers} icon={<TotalUsersIcon />} link="/admin/users" />
             </div>
-            <div className="mt-12 bg-white p-6 rounded-lg shadow-md">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                <StatCard title="Active Users" value={dashboardData.activeUsers} icon={<span className="text-green-600 font-bold text-2xl">●</span>} link="/admin/users" />
+                <StatCard title="Suspended Users" value={dashboardData.suspendedUsers} icon={<span className="text-gray-600 font-bold text-2xl">●</span>} link="/admin/users" />
+                <StatCard title="Flagged Users" value={dashboardData.flaggedUsers} icon={<span className="text-red-600 font-bold text-2xl">!</span>} link="/admin/reports" />
+                <StatCard title="New Users (7d)" value={dashboardData.newUsers7d} icon={<span className="text-blue-600 font-bold text-2xl">7d</span>} link="/admin/users?new=true" />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-xl font-bold mb-4">Recent Activity (Last 5 Signups)</h3>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -43,12 +49,13 @@ export default function DashboardClient({ dashboardData }: { dashboardData: any 
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {dashboardData.recentActivity.map((activity: any) => (
-                                
-                             <RecentActivityRow key={activity.id} activity={activity} />
+                                <RecentActivityRow key={activity.id} activity={activity} />
                             ))}
                         </tbody>
                     </table>

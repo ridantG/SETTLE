@@ -11,8 +11,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
   }
 
-  const cookieStore = cookies();
-  
+  // FIX: cookies() must be awaited in Next.js 14.2+/15
+  const cookieStore = await cookies();
+
   // Create a Supabase client specifically for this Route Handler
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,9 +42,7 @@ export async function POST(request: Request) {
   );
 
   // Perform the OTP sign-in request
-  const { error } = await supabase.auth.signInWithOtp({
-    phone: phone,
-  });
+  const { error } = await supabase.auth.signInWithOtp({ phone });
 
   if (error) {
     console.error('Error sending OTP:', error);

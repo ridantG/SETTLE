@@ -131,6 +131,11 @@ export default function LoggedInHeader() {
                             <TiffinIcon />
                             <span className="font-medium">Tiffin</span>
                         </Link>
+                        <Link href="/rentals" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v12H4zM4 16h16M12 4v16" /></svg>
+    <span className="font-medium">Rent</span>
+</Link>
+
                         <div className="relative" ref={dropdownRef}>
                             <button onClick={() => setIsDropdownOpen(prev => !prev)} className="text-gray-600 hover:text-green-600 focus:outline-none">
                                 <ProfileIcon />

@@ -9,20 +9,39 @@ import DashboardClient from './DashboardClient'; // The interactive client compo
 
 async function getDashboardData() {
     const supabaseAdmin = createAdminClient();
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [ openReportsRes, newUsersRes, totalUsersRes, recentActivityRes ] = await Promise.all([
+    const [
+        openReportsRes,
+        newUsersRes,
+        totalUsersRes,
+        recentActivityRes,
+        activeUsersRes,
+        suspendedUsersRes,
+        flaggedUsersRes,
+        newUsers7dRes
+    ] = await Promise.all([
         supabaseAdmin.from('profiles').select('id', { count: 'exact' }).gt('flags', 0),
         supabaseAdmin.from('profiles').select('id', { count: 'exact' }).gte('created_at', twentyFourHoursAgo),
         supabaseAdmin.from('profiles').select('id', { count: 'exact' }),
-        supabaseAdmin.from('profiles').select('id, name, email, created_at').order('created_at', { ascending: false }).limit(5)
+        supabaseAdmin.from('profiles').select('id, name, email, created_at, is_suspended, role').order('created_at', { ascending: false }).limit(5),
+        supabaseAdmin.from('profiles').select('id', { count: 'exact' }).eq('is_suspended', false),
+        supabaseAdmin.from('profiles').select('id', { count: 'exact' }).eq('is_suspended', true),
+        supabaseAdmin.from('profiles').select('id', { count: 'exact' }).gt('flags', 0),
+        supabaseAdmin.from('profiles').select('id', { count: 'exact' }).gte('created_at', sevenDaysAgo)
     ]);
 
     return {
         openReports: openReportsRes.count ?? 0,
         newUsers: newUsersRes.count ?? 0,
         totalUsers: totalUsersRes.count ?? 0,
-        recentActivity: recentActivityRes.data ?? []
+        recentActivity: recentActivityRes.data ?? [],
+        activeUsers: activeUsersRes.count ?? 0,
+        suspendedUsers: suspendedUsersRes.count ?? 0,
+        flaggedUsers: flaggedUsersRes.count ?? 0,
+        newUsers7d: newUsers7dRes.count ?? 0
     };
 }
 

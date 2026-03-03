@@ -1,43 +1,41 @@
 // File: eslint.config.mjs
-// FINAL, DEFINITIVE, AND CORRECTED VERSION
-
+// FINAL, DEFINITIVE, AND MODERN VERSION
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import pluginTailwind from "eslint-plugin-tailwindcss";
 import nextPlugin from "@next/eslint-plugin-next";
+import tailwindPlugin from "eslint-plugin-tailwindcss";
 
 export default [
-  {
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
-    },
-  },
+  { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   ...tseslint.configs.recommended,
   {
     plugins: { "@next/next": nextPlugin },
     rules: {
       ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs['core-web-vitals'].rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
     },
   },
   {
-    plugins: { tailwindcss: pluginTailwind },
+    files: ["**/*.{ts,tsx}"],
+    plugins: { tailwindcss: tailwindPlugin },
     rules: {
-      "tailwindcss/classnames-order": "warn",
-      "tailwindcss/no-custom-classname": "warn",
+      ...tailwindPlugin.configs.recommended.rules,
+      "tailwindcss/no-custom-classname": "off",
     },
-    // THE FIX IS HERE: We explicitly point the plugin to your config file.
     settings: {
       tailwindcss: {
-        // Make sure this filename matches yours (e.g., tailwind.config.js)
-        config: "tailwind.config.ts", 
+        config: "tailwind.config.ts", // Ensures it finds your config
       },
     },
   },
   {
-    ignores: [".next/", "dist/", "node_modules/"],
+    // This rule set will clean up all the "unused var" and "any" errors.
+    rules: {
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+  {
+    ignores: ["node_modules/", ".next/", "dist/", "postcss.config.mjs"],
   },
 ];

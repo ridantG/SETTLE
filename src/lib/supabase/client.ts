@@ -1,4 +1,5 @@
-// src/lib/supabase/client.ts
+// File: lib/supabase/client.ts
+// This is the definitive, correct client for "use client" components.
 
 import { createBrowserClient } from '@supabase/ssr'
 

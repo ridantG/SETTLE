@@ -24,8 +24,17 @@ export default function RecentActivityRow({ activity }: { activity: any }) {
                 {activity.email}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {/* On the first render, this will show the raw date. After hydration, it will show the local date. */}
                 {formattedDate}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {activity.is_suspended ? (
+                    <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">Suspended</span>
+                ) : (
+                    <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                )}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {activity.role || 'N/A'}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                 <Link

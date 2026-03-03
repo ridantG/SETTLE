@@ -1,18 +1,17 @@
 // File: app/api/chat/[matchId]/messages/route.ts
-// FINAL, CORRECTED VERSION with the correct App Router function signature.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// THE FIX IS HERE: The function signature now correctly matches the
-// modern Next.js App Router standard.
+// Correct Next.js App Router signature
 export async function POST(
     request: NextRequest,
-    { params }: { params: { matchId: string } }
+    context: { params: Promise<{ matchId: string }> }
 ) {
+    const { matchId } = await context.params;
+
     const supabase = createClient();
     const { content } = await request.json();
-    const matchId = params.matchId;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -32,11 +31,18 @@ export async function POST(
     
     const { error: insertError } = await supabase
         .from('messages')
-        .insert({ match_id: matchId, sender_id: user.id, content });
+        .insert({
+            match_id: matchId,
+            sender_id: user.id,
+            content
+        });
 
     if (insertError) {
         return NextResponse.json({ error: 'Failed to send message.' }, { status: 500 });
     }
 
-    return NextResponse.json({ message: 'Message sent successfully.' }, { status: 201 });
+    return NextResponse.json(
+        { message: 'Message sent successfully.' },
+        { status: 201 }
+    );
 }

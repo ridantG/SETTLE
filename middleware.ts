@@ -1,54 +1,70 @@
 // File: middleware.ts
-// FINAL, DEFINITIVE, AND SECURE VERSION
+// FINAL, DEFINITIVE VERSION
+// Now explicitly skips all auth and api routes to prevent conflicts.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
+  // 1. EXPLICITLY SKIP /auth and /api routes
+  // This prevents the middleware from interfering with login callbacks and API actions.
+  if (request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+
+  // 2. Create the client and manage session
   const { supabase, response } = createClient(request);
-
-  // This line is crucial for keeping the user's session refreshed.
   const { data: { session } } = await supabase.auth.getSession();
-
   const { pathname } = request.nextUrl;
 
-  // --- Admin Route Protection ---
-  // This logic protects all routes starting with /admin
-  if (pathname.startsWith('/admin')) {
-    // If no one is logged in, redirect to the admin login page.
-    if (!session) {
-      return NextResponse.redirect(new URL('/admin/login', request.url));
-    }
+  // Define routes
+  const adminRoutes = ['/admin'];
+  const protectedUserRoutes = ['/dashboard', '/preferences', '/chat', '/forum', '/likes-you', '/seeker-results', '/roommate-results'];
 
-    // If someone is logged in, check if they are an admin.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', session.user.id)
-      .single();
-    
-    // If they are NOT an admin, sign them out and redirect to the main page for security.
-    if (!profile?.is_admin) {
-      await supabase.auth.signOut();
+  // --- Scenario 1: User is NOT Logged In ---
+  if (!session) {
+    const isProtectedRoute = protectedUserRoutes.some(prefix => pathname.startsWith(prefix)) || adminRoutes.some(prefix => pathname.startsWith(prefix));
+    if (isProtectedRoute) {
       return NextResponse.redirect(new URL('/', request.url));
     }
+    return response;
   }
 
-  // --- Regular User Logic ---
-  if (session) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin, role')
-      .eq('id', session.user.id)
-      .single();
-      
-    // If a logged-in user is an admin, always ensure they are in the admin area.
-    // This prevents them from being redirected to the user dashboard.
-    if (profile?.is_admin && !pathname.startsWith('/admin')) {
+  // --- Scenario 2: User IS Logged In ---
+  const isAdminByEmail = session.user.email === process.env.SUPABASE_ADMIN_EMAIL;
+  const is_admin = isAdminByEmail ? true : undefined;
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', session.user.id)
+    .single();
+
+  // 2a. User is an ADMIN
+  if (profile?.is_admin || is_admin === true) {
+    // If admin tries to access a user page, force them to admin dashboard
+    if (protectedUserRoutes.some(prefix => pathname.startsWith(prefix))) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
+    // If admin is on homepage, force them to admin dashboard
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
+    return response;
   }
-  
+
+  // 2b. User is a REGULAR USER
+  if (!profile?.is_admin) {
+    // If regular user tries to access admin page, force them to user dashboard
+    if (adminRoutes.some(prefix => pathname.startsWith(prefix))) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    // If regular user is on homepage, force them to user dashboard
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    return response;
+  }
+
   return response;
 }
 
@@ -59,9 +75,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - api/ (API routes)
-     * - auth/ (Supabase callback route)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/|auth/).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

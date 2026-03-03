@@ -1,59 +1,42 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+// File: src/lib/supabase/middleware.ts
+// FINAL, DEFINITIVE VERSION
+// This file connects the Middleware "Guard" to the Supabase Auth system.
+
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export const createClient = (request: NextRequest) => {
-  // Create an unmodified response
+  // 1. Create an initial response.
+  // We need this because Supabase might want to write cookies to it.
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
+  // 2. Create the Supabase client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
+        // Middleware works with request.cookies (synchronous)
+        getAll() {
+          return request.cookies.getAll()
         },
-        set(name: string, value: string, options: CookieOptions) {
-          // If the cookie is set, update the request's cookies.
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+        setAll(cookiesToSet) {
+          // Update the request cookies (so the immediate request sees them)
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          
+          // Update the response cookies (so the browser saves them)
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
-          // ... and update the response's cookies
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          // If the cookie is removed, update the request's cookies.
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          // ... and update the response's cookies
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          cookiesToSet.forEach(({ name, value, options }) => 
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }

@@ -1,44 +1,52 @@
-// File: app/dashboard/page.tsx
-// FINAL VERSION: A Server Component to securely fetch initial data
-// and perform the self-healing profile check.
+// File: src/app/dashboard/page.tsx
+// FINAL VERSION: The secure entry point for the User Dashboard.
 
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import LoggedInHeader from '@/components/LoggedInHeader';
 import Footer from '@/components/Footer';
-import { redirect } from 'next/navigation';
-import DashboardClient from './DashboardClient';
-import { type User } from '@supabase/supabase-js';
+import DashboardClient from './DashboardClient'; 
 
 export default async function DashboardPage() {
     const supabase = createClient();
+    
+    // 1. Securely fetch the current user
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Middleware has already ensured the user is logged in.
-    // This is an extra layer of certainty.
+    // 2. Security Guard: If not logged in, kick them out to the landing page.
     if (!user) {
         redirect('/');
     }
 
-    // This self-healing 'upsert' guarantees a profile exists for the logged-in user.
+    // 3. Data Consistency (Self-Healing)
+    // We use 'upsert' to guarantee a profile row exists. 
+    // This prevents "null profile" errors if the signup hook failed.
     const { data: profile } = await supabase
         .from('profiles')
-        .upsert({ id: user.id, email: user.email, name: user.user_metadata?.full_name }, { onConflict: 'id' })
-        .select('name, age, gender, city, role')
+        .upsert({ 
+            id: user.id, 
+            email: user.email, 
+            name: user.user_metadata?.full_name 
+        }, { onConflict: 'id' })
+        .select('*')
         .single();
     
-    // If the user already has a role, redirect them immediately from the server.
-    if (profile?.role === 'seeker') {
-        redirect('/seeker-results');
-    } else if (profile?.role === 'lister') {
-        redirect('/roommate-results');
+    // 4. Admin Redirect
+    // Admins have a totally different dashboard, so we send them away.
+    if (profile?.is_admin) {
+        redirect('/admin/dashboard');
     }
 
-    // If no role exists, we render the page and pass the data to the Client Component.
+    // 5. Render the Dashboard Menu
+    // We do NOT redirect Seekers or Listers automatically anymore.
+    // We let them see the menu so they can choose to go to "Forum", "Tiffin", etc.
     return (
-        <div className="min-h-screen bg-white relative">
+        <div className="min-h-screen bg-white relative flex flex-col">
             <LoggedInHeader />
+            
+            {/* Pass the server-fetched data to the Client Component */}
             <DashboardClient user={user} profile={profile} />
+            
         </div>
     );
 }
-

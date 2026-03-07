@@ -10,8 +10,8 @@ export const createClient = () => {
   // This ensures we don't break your other files (like dashboard/page.tsx).
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key',
     {
       cookies: {
         // We handle the async nature of cookies() Next.js 15 INSIDE these methods.

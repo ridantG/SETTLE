@@ -1,5 +1,6 @@
 // File: src/app/dashboard/page.tsx
 // FINAL VERSION: The secure entry point for the User Dashboard.
+export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';

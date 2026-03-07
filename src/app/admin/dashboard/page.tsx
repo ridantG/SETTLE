@@ -1,5 +1,6 @@
 // File: app/admin/dashboard/page.tsx
 // FINAL, DEFINITIVE VERSION: The secure Server Component for your dashboard.
+export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';

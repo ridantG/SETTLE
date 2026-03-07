@@ -1,5 +1,6 @@
 // File: app/likes-you/page.tsx
 // FINAL, CORRECTED VERSION: With corrected TypeScript types and data handling.
+export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
 import LoggedInHeader from '@/components/LoggedInHeader';

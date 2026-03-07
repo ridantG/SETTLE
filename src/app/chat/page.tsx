@@ -1,5 +1,6 @@
 // File: app/chat/page.tsx
 // FINAL VERSION: A simple, clean inbox for all active chats.
+export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
 import LoggedInHeader from '@/components/LoggedInHeader';

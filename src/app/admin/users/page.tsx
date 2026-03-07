@@ -1,5 +1,6 @@
 // File: app/admin/users/page.tsx
 // The definitive, secure, server-rendered User Management page.
+export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';

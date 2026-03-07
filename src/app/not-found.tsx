@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 
 // A simple, inline SVG icon for the page
 const NotFoundIcon = () => (
@@ -16,21 +16,26 @@ const NotFoundIcon = () => (
 );
 
 export default function NotFound() {
-    const supabase = useMemo(() => createClient(), []);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // This effect runs on the client to check if the user is logged in.
+    // Only create the Supabase client and check auth on the client side.
+    // This prevents build errors during static prerendering (e.g. on Vercel).
     useEffect(() => {
         const checkSession = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                setIsLoggedIn(true);
+            try {
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    setIsLoggedIn(true);
+                }
+            } catch {
+                // Supabase not configured or unavailable — just show default
             }
             setLoading(false);
         };
         checkSession();
-    }, [supabase]);
+    }, []);
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">

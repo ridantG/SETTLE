@@ -7,7 +7,7 @@ export const getOptimizedImageUrl = (
     width: number, 
     height: number
   ): string => {
-    if (!url) return '/images/person1.jpg'; // Return a default placeholder if no URL
+    if (!url) return 'https://placehold.co/200x200?text=No+Image';
     
     // Use the 'render/image/upload' path for Supabase's transformation API
     const transformedUrl = url.replace(

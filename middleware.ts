@@ -14,7 +14,9 @@ export async function middleware(request: NextRequest) {
 
   // 2. Create the client and manage session
   const { supabase, response } = createClient(request);
-  const { data: { session } } = await supabase.auth.getSession();
+  // SECURITY FIX: Use getUser() instead of getSession() — getSession() reads from
+  // cookies which can be tampered with. getUser() validates against Supabase's auth server.
+  const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
   // Define routes
@@ -22,7 +24,7 @@ export async function middleware(request: NextRequest) {
   const protectedUserRoutes = ['/dashboard', '/preferences', '/chat', '/forum', '/likes-you', '/seeker-results', '/roommate-results'];
 
   // --- Scenario 1: User is NOT Logged In ---
-  if (!session) {
+  if (!user) {
     const isProtectedRoute = protectedUserRoutes.some(prefix => pathname.startsWith(prefix)) || adminRoutes.some(prefix => pathname.startsWith(prefix));
     if (isProtectedRoute) {
       return NextResponse.redirect(new URL('/', request.url));
@@ -31,12 +33,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- Scenario 2: User IS Logged In ---
-  const isAdminByEmail = session.user.email === process.env.SUPABASE_ADMIN_EMAIL;
+  const isAdminByEmail = user.email === process.env.SUPABASE_ADMIN_EMAIL;
   const is_admin = isAdminByEmail ? true : undefined;
   const { data: profile } = await supabase
     .from('profiles')
     .select('is_admin')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single();
 
   // 2a. User is an ADMIN

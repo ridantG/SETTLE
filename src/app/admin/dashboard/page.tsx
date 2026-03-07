@@ -49,8 +49,20 @@ export default async function AdminDashboardPage() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-        // This check is now primarily handled by middleware, but serves as a final safeguard.
         redirect('/admin/login');
+    }
+
+    // SECURITY FIX: Verify the user is actually an admin before loading admin data.
+    // This is a defense-in-depth check — middleware handles this too, but if middleware
+    // is misconfigured or bypassed, this prevents unauthorized access.
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile?.is_admin) {
+        redirect('/dashboard');
     }
 
     const dashboardData = await getDashboardData();

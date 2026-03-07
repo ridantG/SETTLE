@@ -2,7 +2,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, useId } from "react";
 import toast from "react-hot-toast";
 
 type ImageUploadProps = {
@@ -14,6 +14,7 @@ export default function ImageUpload({ label, onUpload }: ImageUploadProps) {
   const supabase = createClient();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const inputId = useId();
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -79,7 +80,7 @@ export default function ImageUpload({ label, onUpload }: ImageUploadProps) {
 
       <div className="mt-4">
         <label
-          htmlFor="simple-image-upload"
+          htmlFor={inputId}
           className="cursor-pointer bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
         >
           {uploading ? "Uploading..." : "Choose Photo"}
@@ -87,7 +88,7 @@ export default function ImageUpload({ label, onUpload }: ImageUploadProps) {
 
         <input
           type="file"
-          id="simple-image-upload"
+          id={inputId}
           className="hidden"
           accept="image/png, image/jpeg"
           onChange={handleFileChange}

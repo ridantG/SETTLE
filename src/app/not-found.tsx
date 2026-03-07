@@ -23,8 +23,8 @@ export default function NotFound() {
     // This effect runs on the client to check if the user is logged in.
     useEffect(() => {
         const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
                 setIsLoggedIn(true);
             }
             setLoading(false);

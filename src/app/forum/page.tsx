@@ -55,7 +55,23 @@ const ConfirmationModal = ({
     onConfirm: () => void;
     itemType: string;
 }) => {
-    return null; // placeholder — original did not include implementation
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                <h3 className="text-lg font-bold text-gray-800">Delete {itemType}?</h3>
+                <p className="mt-2 text-gray-600">This action cannot be undone.</p>
+                <div className="flex justify-end gap-3 mt-6">
+                    <button onClick={onClose} className="px-4 py-2 text-gray-600 font-semibold rounded-lg hover:bg-gray-100">
+                        Cancel
+                    </button>
+                    <button onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const PostCard = ({
@@ -135,6 +151,13 @@ export default function ForumPage() {
     const [newPostContent, setNewPostContent] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // State for editing posts
+    const [editingPostId, setEditingPostId] = useState<number | null>(null);
+    const [editContent, setEditContent] = useState("");
+
+    // State for delete confirmation
+    const [deletePostId, setDeletePostId] = useState<number | null>(null);
+
     const fetchPosts = useCallback(async () => {
         setLoading(true);
 
@@ -205,11 +228,47 @@ export default function ForumPage() {
         setIsSubmitting(false);
     };
 
-    const handlePostAction = (action: string, id: number, content?: string) => {
-        console.log(`Action: ${action} on ID: ${id}`);
+    const handlePostAction = async (action: string, id: number, content?: string) => {
+        if (action === "edit_post") {
+            setEditingPostId(id);
+            setEditContent(content || "");
+        }
+        if (action === "delete_post") {
+            setDeletePostId(id);
+        }
+    };
 
-        if (action === "edit_post") toast(`Editing post ID: ${id}`);
-        if (action === "delete_post") toast.error(`Deleting post ID: ${id}`);
+    const handleEditSubmit = async (postId: number) => {
+        if (editContent.trim() === "") return;
+        setIsSubmitting(true);
+        const response = await fetch(`/api/forum/posts/${postId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: editContent }),
+        });
+        if (response.ok) {
+            toast.success("Post updated!");
+            setEditingPostId(null);
+            setEditContent("");
+            fetchPosts();
+        } else {
+            toast.error("Failed to update post.");
+        }
+        setIsSubmitting(false);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deletePostId) return;
+        const response = await fetch(`/api/forum/posts/${deletePostId}`, {
+            method: "DELETE",
+        });
+        if (response.ok) {
+            toast.success("Post deleted!");
+            setDeletePostId(null);
+            fetchPosts();
+        } else {
+            toast.error("Failed to delete post.");
+        }
     };
 
     return (
@@ -284,12 +343,41 @@ export default function ForumPage() {
                         <p>Loading posts...</p>
                     ) : posts.length > 0 ? (
                         posts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                currentUser={currentUser}
-                                onAction={handlePostAction}
-                            />
+                            <div key={post.id}>
+                                {editingPostId === post.id ? (
+                                    <div className="bg-white p-6 rounded-lg shadow-md">
+                                        <textarea
+                                            value={editContent}
+                                            onChange={(e) => setEditContent(e.target.value)}
+                                            className="w-full p-3 bg-gray-50 rounded-lg border border-gray-300"
+                                            rows={3}
+                                            disabled={isSubmitting}
+                                        />
+                                        <div className="flex justify-end gap-3 mt-4">
+                                            <button
+                                                onClick={() => { setEditingPostId(null); setEditContent(""); }}
+                                                className="px-4 py-2 text-gray-600 font-semibold rounded-lg hover:bg-gray-100"
+                                                disabled={isSubmitting}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditSubmit(post.id)}
+                                                disabled={isSubmitting}
+                                                className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+                                            >
+                                                {isSubmitting ? "Saving..." : "Save"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <PostCard
+                                        post={post}
+                                        currentUser={currentUser}
+                                        onAction={handlePostAction}
+                                    />
+                                )}
+                            </div>
                         ))
                     ) : (
                         <EmptyState
@@ -306,6 +394,14 @@ export default function ForumPage() {
                         />
                     )}
                 </div>
+
+                {/* Delete Confirmation Modal */}
+                <ConfirmationModal
+                    isOpen={deletePostId !== null}
+                    onClose={() => setDeletePostId(null)}
+                    onConfirm={handleDeleteConfirm}
+                    itemType="Post"
+                />
             </main>
         </div>
     );

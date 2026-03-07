@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // THE FIX IS HERE: The column name 'dismisser_id' is now correct.
     const { error } = await supabase
         .from('dismissals')
-        .insert({ dismissser_id: user.id, dismissed_id: dismissed_id });
+        .insert({ dismisser_id: user.id, dismissed_id: dismissed_id });
 
     if (error && error.code !== '23505') { // Ignore unique violation errors
         console.error("API Dismiss Error:", error);

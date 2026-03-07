@@ -14,8 +14,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Please provide at least 50 characters to summarize.' }, { status: 400 });
     }
 
-    // This is your Gemini API endpoint. Leave the API key empty.
-    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`;
+    // Use the Gemini API key from environment variables (never hardcode secrets)
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return NextResponse.json({ error: 'AI summarization is not configured.' }, { status: 503 });
+    }
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
     
     // This is a professional, detailed prompt that instructs the AI.
     const systemPrompt = `You are a helpful assistant for a roommate finding app called Settle. Your task is to summarize the following user description into a clean, concise, friendly, and positive bulleted list. Use markdown for the bullet points (e.g., "- Item 1"). Extract key lifestyle traits, hobbies, personality, and what they are looking for in a roommate or a living space. Do not add any extra commentary before or after the list. Focus on making the user sound like a great potential roommate.`;
